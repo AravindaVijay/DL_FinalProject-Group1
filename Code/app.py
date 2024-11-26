@@ -29,7 +29,7 @@ st.markdown(
 
 def home_demo_page():
     st.markdown('<div class="header-container">', unsafe_allow_html=True)
-    logo = Image.open("logo.png")  
+    logo = Image.open("assets\\logo.png")  
     col1, col2 = st.columns([2, 5])  
     with col1:
         st.image(logo, width=500)  
@@ -71,3 +71,7 @@ if page == "Home/Demo":
     home_demo_page()
 elif page == "About":
     about_page()
+
+
+
+
