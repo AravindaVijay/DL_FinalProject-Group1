@@ -1,7 +1,7 @@
 from torchvision import transforms
-from data_loader import get_caption_dataloader
+from data_loader import get_data_loader
 
- = '../coco_dataset/train2017'
+images_dir = '../coco_dataset/train2017'
 captions_path = '../coco_dataset/annotations/captions_train2017.json'
 
 transform = transforms.Compose([
@@ -12,9 +12,10 @@ transform = transforms.Compose([
 ])
 
 # Create DataLoader
-dataloader = get_caption_dataloader(
+dataloader = get_data_loader(
     images_dir=images_dir,
     captions_path=captions_path,
+    vocab_exists=False,
     batch_size=1,
     transform=transform
 )
@@ -22,12 +23,14 @@ dataloader = get_caption_dataloader(
 # Iterate through DataLoader
 for batch in dataloader:
     images = batch['images']
-    captions = batch['captions']
+    all_captions = batch['all_captions']
+    tokenized_caption = batch['tokenized_caption']
     image_ids = batch['image_ids']
 
     print(f"Processed {len(images)} images with captions.")
-    for img_caps in captions[:1]:  # Print captions for the first image in the batch
+    for img_caps in all_captions[:1]:  # Print captions for the first image in the batch
         print(f"Captions: {img_caps}")
+    print(f"Tokenized caption: {tokenized_caption}")
 
     break
 
