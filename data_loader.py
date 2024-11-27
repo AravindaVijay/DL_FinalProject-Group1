@@ -2,20 +2,49 @@ import os
 from pycocotools.coco import COCO
 import cv2
 import torch
+import numpy as np
+import nltk
+from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
+from vocabulary import Vocabulary
+
+nltk.download('punkt')
+
 
 class COCOCaptionDataset(Dataset):
-    def __init__(self, images_dir, captions_path, transform=None):
+
+    def __init__(self, images_dir, captions_path, vocab_exists=False, transform=None):
         """
         Args:
             images_dir (str): Path to the directory containing images.
             captions_path (str): Path to the COCO captions file.
+            vocab_exists: If False, create vocab from scratch and override any existing vocab_file.
+                          If True, load vocab from existing vocab_file, if it exists.
             transform (callable, optional): Transformation to apply to the images.
         """
         self.coco = COCO(captions_path)
         self.images_dir = images_dir
         self.transform = transform
         self.image_ids = list(self.coco.imgs.keys())
+        self.vocab_exists = vocab_exists
+
+        # create vocabulary from the captions
+        self.vocab = Vocabulary(annotations_file=captions_path, vocab_exists=vocab_exists)
+
+        self.coco = COCO(captions_path)
+        self.ids = list(self.coco.anns.keys())
+        print("Obtaining caption lengths...")
+
+        #  get list of tokens for each caption
+        tokenized_captions = [
+            nltk.tokenize.word_tokenize(
+                str(self.coco.anns[self.ids[index]]["caption"]).lower()
+            )
+            for index in tqdm(np.arange(len(self.ids)))
+        ]
+
+        # get len of each caption
+        self.caption_lengths = [len(token) for token in tokenized_captions]
 
     def __len__(self):
         return len(self.image_ids)
@@ -33,7 +62,12 @@ class COCOCaptionDataset(Dataset):
         # Load captions
         ann_ids = self.coco.getAnnIds(imgIds=image_id)
         annotations = self.coco.loadAnns(ann_ids)
-        captions = [ann['caption'] for ann in annotations]
+        all_captions = [ann['caption'] for ann in annotations]
+        tokenized_caption = [self.vocab(self.vocab.start_word)]
+        tokens = nltk.tokenize.word_tokenize(str(all_captions[0]).lower())
+        tokenized_caption.extend([self.vocab(token) for token in tokens])
+        tokenized_caption.append(self.vocab(self.vocab.end_word))
+        tokenized_caption = torch.Tensor(tokenized_caption).long()
 
         # Apply transformations
         if self.transform:
@@ -41,11 +75,12 @@ class COCOCaptionDataset(Dataset):
 
         return {
             'image': image,
-            'captions': captions,
+            'all_captions': all_captions,
+            'tokenized_caption': tokenized_caption,
             'image_id': image_id
         }
 
-def get_caption_dataloader(images_dir, captions_path, batch_size=4, shuffle=True, transform=None):
+def get_data_loader(images_dir, captions_path, vocab_exists=False, batch_size=4, shuffle=True, transform=None):
     """
     Creates a DataLoader for the COCO captions dataset.
 
@@ -59,15 +94,16 @@ def get_caption_dataloader(images_dir, captions_path, batch_size=4, shuffle=True
     Returns:
         DataLoader: PyTorch DataLoader for the COCO captions dataset.
     """
-    dataset = COCOCaptionDataset(images_dir, captions_path, transform)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
+    dataset = COCOCaptionDataset(images_dir, captions_path, vocab_exists, transform)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle,  collate_fn=collate_fn)
 
 def collate_fn(batch):
     """
     Custom collate function to handle varying numbers of captions per image.
     """
     images = [item['image'] for item in batch]
-    captions = [item['captions'] for item in batch]
+    all_captions = [item['all_captions'] for item in batch]
+    tokenized_caption = [item['tokenized_caption'] for item in batch]
     image_ids = [item['image_id'] for item in batch]
 
     # If using PyTorch tensors for images, stack them
@@ -76,6 +112,7 @@ def collate_fn(batch):
 
     return {
         'images': images,
-        'captions': captions,
+        'all_captions': all_captions,
+        'tokenized_caption': tokenized_caption,
         'image_ids': image_ids
     }
