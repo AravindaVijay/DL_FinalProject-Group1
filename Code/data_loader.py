@@ -110,6 +110,9 @@ def collate_fn(batch):
     if isinstance(images[0], torch.Tensor):
         images = torch.stack(images)
 
+    # Pad tokenized captions to the same length and stack into a tensor
+    tokenized_caption = torch.nn.utils.rnn.pad_sequence(tokenized_caption, batch_first=True, padding_value=0)
+    
     return {
         'images': images,
         'all_captions': all_captions,
