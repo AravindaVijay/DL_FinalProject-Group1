@@ -80,6 +80,7 @@ class COCOCaptionDataset(Dataset):
             'image_id': image_id
         }
 
+
 def get_data_loader(images_dir, captions_path, vocab_exists=False, batch_size=4, shuffle=True, transform=None):
     """
     Creates a DataLoader for the COCO captions dataset.
@@ -95,7 +96,8 @@ def get_data_loader(images_dir, captions_path, vocab_exists=False, batch_size=4,
         DataLoader: PyTorch DataLoader for the COCO captions dataset.
     """
     dataset = COCOCaptionDataset(images_dir, captions_path, vocab_exists, transform)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle,  collate_fn=collate_fn)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
+
 
 def collate_fn(batch):
     """
@@ -112,7 +114,7 @@ def collate_fn(batch):
 
     # Pad tokenized captions to the same length and stack into a tensor
     tokenized_caption = torch.nn.utils.rnn.pad_sequence(tokenized_caption, batch_first=True, padding_value=0)
-    
+
     return {
         'images': images,
         'all_captions': all_captions,
