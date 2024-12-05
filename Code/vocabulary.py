@@ -14,6 +14,7 @@ class Vocabulary(object):
         start_word="<start>",
         end_word="<end>",
         unk_word="<unk>",
+        pad_word="<pad>",
         annotations_file="../coco_dataset/annotations/captions_train2017.json",
         vocab_exists=False,
     ):
@@ -32,6 +33,7 @@ class Vocabulary(object):
         self.start_word = start_word
         self.end_word = end_word
         self.unk_word = unk_word
+        self.pad_word = pad_word
         self.annotations_file = annotations_file
         self.vocab_exists = vocab_exists
         self.get_vocab()
@@ -71,6 +73,7 @@ class Vocabulary(object):
         self.add_word(self.start_word)
         self.add_word(self.end_word)
         self.add_word(self.unk_word)
+        self.add_word(self.pad_word)
 
         coco = COCO(self.annotations_file)
         counter = Counter()
