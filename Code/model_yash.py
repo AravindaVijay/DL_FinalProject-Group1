@@ -1,12 +1,12 @@
-# import tensorflow as tf
-# from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dense, Embedding, LSTM, Add, Dropout
-# from tensorflow.keras.models import Model
-# from tensorflow.keras.preprocessing.sequence import pad_sequences
-# from tensorflow.keras.utils import to_categorical
-# from tensorflow.keras.preprocessing.text import Tokenizer
-# import tensorflow_datasets as tfds
-# import numpy as np
-# import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dense, Embedding, LSTM, Add, Dropout
+from tensorflow.keras.models import Model
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.preprocessing.text import Tokenizer
+import tensorflow_datasets as tfds
+import numpy as np
+import matplotlib.pyplot as plt
 
 # # -------------------------------
 # # Step 1: Load and Preprocess Dataset
@@ -501,3 +501,115 @@ def generate_caption(image_path, tokenizer, max_length):
 example_image_path = "/path/to/image.jpg"
 caption = generate_caption(example_image_path, tokenizer, max_length)
 print("Generated Caption:", caption)
+
+
+####### Validating Captins and images
+
+import json
+import os
+import pickle
+import random
+from PIL import Image
+import matplotlib.pyplot as plt
+
+# Paths to the COCO dataset
+annotations_folder = "coco_dataset/annotations"
+train_images_folder = "coco_dataset/train2017"
+val_images_folder = "coco_dataset/val2017"
+
+# Annotations files
+train_annotations_path = os.path.join(annotations_folder, "captions_train2017.json")
+val_annotations_path = os.path.join(annotations_folder, "captions_val2017.json")
+
+# Function to process annotations
+def process_annotations(annotations_path, images_folder):
+    # Load Annotations JSON
+    with open(annotations_path, 'r') as f:
+        annotations = json.load(f)
+
+    # Map Image IDs to Captions
+    image_caption_map = {}
+    for ann in annotations['annotations']:
+        image_id = ann['image_id']
+        caption = ann['caption']
+        if image_id not in image_caption_map:
+            image_caption_map[image_id] = []
+        image_caption_map[image_id].append(caption)
+
+    # Map Image IDs to File Paths
+    image_id_to_path = {}
+    for image_info in annotations['images']:
+        image_id = image_info['id']
+        filename = image_info['file_name']
+        image_id_to_path[image_id] = os.path.join(images_folder, filename)
+
+    # Combine Image Paths and Captions
+    image_path_to_captions = {}
+    for image_id, captions in image_caption_map.items():
+        if image_id in image_id_to_path:
+            image_path = image_id_to_path[image_id]
+            image_path_to_captions[image_path] = captions
+
+    return image_path_to_captions
+
+# Process train2017 and val2017 annotations
+print("Processing train2017 annotations...")
+train_image_path_to_captions = process_annotations(train_annotations_path, train_images_folder)
+
+print("Processing val2017 annotations...")
+val_image_path_to_captions = process_annotations(val_annotations_path, val_images_folder)
+
+# Save the mappings for later use
+with open("train_image_path_to_captions.pkl", "wb") as f:
+    pickle.dump(train_image_path_to_captions, f)
+
+with open("val_image_path_to_captions.pkl", "wb") as f:
+    pickle.dump(val_image_path_to_captions, f)
+
+print("Mappings saved successfully!")
+
+# Validation Functions
+def check_total_images(folder_path, mapping):
+    total_images = len(os.listdir(folder_path))
+    mapped_images = len(mapping)
+    print(f"Total images in {folder_path}: {total_images}")
+    print(f"Mapped images: {mapped_images}")
+    unmapped_files = total_images - mapped_images
+    if unmapped_files > 0:
+        print(f"Unmapped images: {unmapped_files}")
+    else:
+        print("All images are mapped successfully!")
+
+def display_sample_images(mapping, num_samples=3):
+    sample_paths = random.sample(list(mapping.keys()), num_samples)
+    for path in sample_paths:
+        captions = mapping[path]
+        print(f"Image Path: {path}")
+        print(f"Captions: {captions}")
+        image = Image.open(path)
+        plt.imshow(image)
+        plt.axis("off")
+        plt.title("\n".join(captions), fontsize=12)
+        plt.show()
+
+def validate_image_paths(mapping):
+    invalid_paths = [path for path in mapping.keys() if not os.path.exists(path)]
+    if invalid_paths:
+        print(f"Invalid image paths: {len(invalid_paths)}")
+        print(f"Examples: {invalid_paths[:5]}")
+    else:
+        print("All image paths are valid!")
+
+# Perform validation
+print("\n--- Validation Results ---")
+print("\nChecking train2017 mappings:")
+check_total_images(train_images_folder, train_image_path_to_captions)
+validate_image_paths(train_image_path_to_captions)
+print("\nDisplaying random samples from train2017:")
+display_sample_images(train_image_path_to_captions)
+
+print("\nChecking val2017 mappings:")
+check_total_images(val_images_folder, val_image_path_to_captions)
+validate_image_paths(val_image_path_to_captions)
+print("\nDisplaying random samples from val2017:")
+display_sample_images(val_image_path_to_captions)
