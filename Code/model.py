@@ -36,7 +36,7 @@ random.seed(42)
 class ImageEncoder(nn.Module):
     def __init__(self, embedding_dim, trainable_layers=0):
         super(ImageEncoder, self).__init__()
-        base_model = models.efficientnet_b4(pretrained=True)
+        base_model = models.efficientnet_b3(pretrained=True)
         for param in base_model.parameters():
             param.requires_grad = False
         if trainable_layers > 0:
