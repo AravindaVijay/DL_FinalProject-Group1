@@ -1,11 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="ubuntu@54.198.191.26:22 key" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="deep learning (3)" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
-      <paths name="ubuntu@54.198.191.26:22 key">
+      <paths name="NLP">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/ubuntu/Final_project/DL_FinalProject-Group1" local="$PROJECT_DIR$" web="/" />
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="deep learning">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/ubuntu/DL" local="$PROJECT_DIR$/Code" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="deep learning (2)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="deep learning (3)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/ubuntu/DL" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
