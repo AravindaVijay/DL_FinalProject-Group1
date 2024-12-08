@@ -22,10 +22,7 @@ class COCOCaptionDataset(Dataset):
                           If True, load vocab from existing vocab_file, if it exists.
             transform (callable, optional): Transformation to apply to the images.
         """
-
         self.coco = COCO(captions_path)
-        self.ids = list(self.coco.anns.keys())
-
         self.images_dir = images_dir
         self.transform = transform
         self.image_ids = list(self.coco.imgs.keys())
@@ -34,6 +31,8 @@ class COCOCaptionDataset(Dataset):
         # create vocabulary from the captions
         self.vocab = Vocabulary(annotations_file=captions_path, vocab_exists=vocab_exists)
 
+        self.coco = COCO(captions_path)
+        self.ids = list(self.coco.anns.keys())
         print("Obtaining caption lengths...")
 
         #  get list of tokens for each caption
@@ -71,7 +70,8 @@ class COCOCaptionDataset(Dataset):
         tokenized_caption = torch.Tensor(tokenized_caption).long()
 
         # Apply transformations
-        image = self.transform(image)
+        if self.transform:
+            image = self.transform(image)
 
         return {
             'image': image,

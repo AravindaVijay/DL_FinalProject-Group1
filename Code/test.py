@@ -1,8 +1,8 @@
 from torchvision import transforms
 from data_loader import get_data_loader
 
-images_dir = '../../coco_dataset/train2017'
-captions_path = '../../coco_dataset/annotations/captions_train2017.json'
+images_dir = '../COCO_Data/train2017'
+captions_path = '../COCO_Data/annotations/captions_train2017.json'
 
 transform = transforms.Compose([
     transforms.ToPILImage(),
@@ -15,7 +15,7 @@ transform = transforms.Compose([
 dataloader = get_data_loader(
     images_dir=images_dir,
     captions_path=captions_path,
-    vocab_exists=True,
+    vocab_exists=False,
     batch_size=1,
     transform=transform
 )
