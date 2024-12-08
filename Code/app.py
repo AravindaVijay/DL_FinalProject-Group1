@@ -2,6 +2,11 @@ import streamlit as st
 from gtts import gTTS
 from io import BytesIO
 from PIL import Image
+from generate_caption import generate_caption
+
+# supress all warnings
+import warnings
+warnings.filterwarnings("ignore")
 
 #css
 st.markdown(
@@ -29,7 +34,7 @@ st.markdown(
 
 def home_demo_page():
     st.markdown('<div class="header-container">', unsafe_allow_html=True)
-    logo = Image.open("assets\\logo.png")  
+    logo = Image.open("assets/logo.png")  
     col1, col2 = st.columns([2, 5])  
     with col1:
         st.image(logo, width=500)  
@@ -47,8 +52,9 @@ def home_demo_page():
     
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_column_width=True)
-        caption = "This is a sample caption for the uploaded image."
+        st.image(image, caption="Uploaded Image", use_container_width=True)
+        caption = generate_caption(image)
+        # caption = "Sample caption"
         st.write("Generated Caption: ", caption)
         if st.button("🔊 Convert to Speech"):
             tts = gTTS(text=caption, lang='en')
@@ -71,7 +77,6 @@ if page == "Home/Demo":
     home_demo_page()
 elif page == "About":
     about_page()
-
 
 
 
