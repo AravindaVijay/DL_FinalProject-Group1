@@ -78,29 +78,29 @@
 ###################### CNN AND RNN ########################
 ##########################################################################
 
-import torch
+# import torch
 # import torch.nn as nn
 # import torch.optim as optim
 # from torchvision.models import resnet50, ResNet50_Weights
 # from torchvision import transforms  # Added missing import
 # from data_loader import get_data_loader
-# # from model import ImageEncoder, CaptionDecoder
+# from model import ImageEncoder, CaptionDecoder
 # from model import CustomCNNEncoder, CustomRNNDecoder
 
-# # # Hyperparameters
+# # Hyperparameters
 # num_epochs = 2  # Define the number of epochs for training
 # batch_size = 16
-# # learning_rate = 0.001
+# learning_rate = 0.001
 # embedding_dim = 256
 # hidden_dim = 512
 
 # # Initialize custom models
-# # embedding_dim = 256
-# # hidden_dim = 512
+# embedding_dim = 256
+# hidden_dim = 512
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# # Paths to COCO dataset
+# Paths to COCO dataset
 # images_dir = '../COCO_Data/train2017'
 # captions_path = '../COCO_Data/annotations/captions_train2017.json'
 
@@ -113,15 +113,15 @@ import torch
 # ])
 # dataloader = get_data_loader(images_dir, captions_path, vocab_exists=False, batch_size=batch_size, transform=transform)
 
-# # # Initialize models
-# # encoder = ImageEncoder(embedding_dim=embedding_dim).to(device)
-# # decoder = CaptionDecoder(embedding_dim=embedding_dim, hidden_dim=hidden_dim, vocab_size=len(dataloader.dataset.vocab)).to(device)
+# # Initialize models
+# encoder = ImageEncoder(embedding_dim=embedding_dim).to(device)
+# decoder = CaptionDecoder(embedding_dim=embedding_dim, hidden_dim=hidden_dim, vocab_size=len(dataloader.dataset.vocab)).to(device)
 
 # encoder = CustomCNNEncoder(embedding_dim=embedding_dim).to(device)
 # decoder = CustomRNNDecoder(embedding_dim=embedding_dim, hidden_dim=hidden_dim, vocab_size=len(dataloader.dataset.vocab)).to(device)
 
 # # Set device
-# # Loss and optimizer
+# Loss and optimizer
 # criterion = nn.CrossEntropyLoss()
 # optimizer = torch.optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), lr=0.001)
 
@@ -158,61 +158,68 @@ import torch
 
 # print("Training completed successfully!")
 
+##########################################################################
+###################### Vision Transformer and Custom Decoder #############
+##########################################################################
+
+import os
 import torch
+import random
+import nltk
+import numpy as np
+from PIL import Image
+from pycocotools.coco import COCO
+from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
+import timm
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim import lr_scheduler
 from torchvision import transforms
+from nltk.translate.bleu_score import corpus_bleu
 from tqdm import tqdm
-import timm
-from pycocotools.coco import COCO
-import random
-import numpy as np
-import nltk
-from PIL import Image
-from torch.nn.utils.rnn import pad_sequence
-from nltk.translate.bleu_score import corpus_bleu  # Added for BLEU score computation
 
 
-# Seed for reproducibility
-torch.manual_seed(42)
-np.random.seed(42)
-random.seed(42)
+# Set Random Seed for Reproducibility
+SEED = 42
+torch.manual_seed(SEED)
+np.random.seed(SEED)
+random.seed(SEED)
 
-# Vocabulary Class
-class Vocabulary:
-    def __init__(self, annotations_file, vocab_threshold=5):
-        self.word2idx = {"<pad>": 0, "<start>": 1, "<end>": 2, "<unk>": 3}
-        self.idx2word = {0: "<pad>", 1: "<start>", 2: "<end>", 3: "<unk>"}
-        self.word_count = {}
-        self.vocab_threshold = vocab_threshold
-        self.build_vocab(annotations_file)
 
-    def build_vocab(self, annotations_file):
-        coco = COCO(annotations_file)
-        for ann_id in coco.anns.keys():
+# Vocabulary Builder Class
+class CaptionVocabulary:
+    def __init__(self, annotation_file, threshold=5):
+        self.token_to_id = {"<pad>": 0, "<start>": 1, "<end>": 2, "<unk>": 3}
+        self.id_to_token = {v: k for k, v in self.token_to_id.items()}
+        self.word_counts = {}
+        self.threshold = threshold
+        self._construct_vocab(annotation_file)
+
+    def _construct_vocab(self, annotation_file):
+        coco = COCO(annotation_file)
+        for ann_id in coco.anns:
             caption = coco.anns[ann_id]["caption"]
-            tokens = nltk.tokenize.word_tokenize(caption.lower())
-            for token in tokens:
-                self.word_count[token] = self.word_count.get(token, 0) + 1
-        for word, count in self.word_count.items():
-            if count >= self.vocab_threshold:
-                idx = len(self.word2idx)
-                self.word2idx[word] = idx
-                self.idx2word[idx] = word
+            for word in nltk.word_tokenize(caption.lower()):
+                self.word_counts[word] = self.word_counts.get(word, 0) + 1
+        for word, count in self.word_counts.items():
+            if count >= self.threshold:
+                idx = len(self.token_to_id)
+                self.token_to_id[word] = idx
+                self.id_to_token[idx] = word
 
     def __call__(self, word):
-        return self.word2idx.get(word, self.word2idx["<unk>"])
+        return self.token_to_id.get(word, self.token_to_id["<unk>"])
 
     def __len__(self):
-        return len(self.word2idx)
+        return len(self.token_to_id)
 
-# Dataset Class
-class COCOCaptionDataset(torch.utils.data.Dataset):
-    def __init__(self, images_dir, captions_path, vocab, transform=None):
-        self.coco = COCO(captions_path)
+
+# Dataset for COCO Captions
+class CaptionDataset(Dataset):
+    def __init__(self, image_dir, annotation_path, vocab, transform=None):
+        self.coco = COCO(annotation_path)
         self.image_ids = list(self.coco.imgs.keys())
-        self.images_dir = images_dir
+        self.image_dir = image_dir
         self.vocab = vocab
         self.transform = transform
 
@@ -222,119 +229,127 @@ class COCOCaptionDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         image_id = self.image_ids[idx]
         image_info = self.coco.loadImgs(image_id)[0]
-        image_path = f"{self.images_dir}/{image_info['file_name']}"
-        # Load and transform the image
+        image_path = os.path.join(self.image_dir, image_info["file_name"])
         image = Image.open(image_path).convert("RGB")
+
         if self.transform:
             image = self.transform(image)
-        else:
-            raise ValueError("Transformations must be provided to resize images consistently.")
-        # Load and process the caption
-        ann_ids = self.coco.getAnnIds(imgIds=image_id)
-        captions = [self.coco.anns[ann_id]["caption"] for ann_id in ann_ids]
-        tokenized_caption = [self.vocab("<start>")] + \
-                            [self.vocab(token) for token in nltk.tokenize.word_tokenize(captions[0].lower())] + \
-                            [self.vocab("<end>")]
-        tokenized_caption = torch.tensor(tokenized_caption, dtype=torch.long)
-        return {"image": image, "caption": tokenized_caption}
 
-# DataLoader Function
-def get_data_loader(images_dir, captions_path, vocab, batch_size, transform):
-    dataset = COCOCaptionDataset(images_dir, captions_path, vocab, transform)
-    def collate_fn(batch):
+        caption_ids = self.coco.getAnnIds(imgIds=image_id)
+        captions = [self.coco.anns[ann_id]["caption"] for ann_id in caption_ids]
+        tokens = [self.vocab("<start>")] + \
+                 [self.vocab(word) for word in nltk.word_tokenize(captions[0].lower())] + \
+                 [self.vocab("<end>")]
+
+        return {"image": image, "caption": torch.tensor(tokens, dtype=torch.long)}
+
+
+# DataLoader Utility
+def create_data_loader(img_dir, ann_file, vocab, batch_size, image_transform):
+    dataset = CaptionDataset(img_dir, ann_file, vocab, image_transform)
+    
+    def custom_collate_fn(batch):
         images = torch.stack([item["image"] for item in batch])
         captions = [item["caption"] for item in batch]
         captions_padded = pad_sequence(captions, batch_first=True, padding_value=0)
         return {"image": images, "caption": captions_padded}
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+    
+    return DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
 
-# Vision Transformer Encoder
-class VisionTransformerEncoder(nn.Module):
-    def __init__(self, embedding_dim):
-        super(VisionTransformerEncoder, self).__init__()
-        self.vit = timm.create_model('vit_base_patch16_224', pretrained=True)
-        self.vit.head = nn.Identity()
-        self.fc = nn.Linear(768, embedding_dim)
 
-    def forward(self, images):
-        features = self.vit(images)
-        embeddings = self.fc(features)
-        return embeddings
+# Transformer-based Encoder
+class TransformerEncoder(nn.Module):
+    def __init__(self, output_dim):
+        super(TransformerEncoder, self).__init__()
+        self.model = timm.create_model('vit_base_patch16_224', pretrained=True)
+        self.model.head = nn.Identity()
+        self.fc = nn.Linear(768, output_dim)
 
-# Caption Decoder
-class CaptionDecoder(nn.Module):
-    def __init__(self, embedding_dim, hidden_dim, vocab_size, vocab, num_layers=1):
-        super(CaptionDecoder, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.word_embeddings = nn.Embedding(vocab_size, embedding_dim)
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim, num_layers, batch_first=True)
+    def forward(self, x):
+        features = self.model(x)
+        return self.fc(features)
+
+
+# Caption Generator
+class CaptionGenerator(nn.Module):
+    def __init__(self, embedding_size, hidden_dim, vocab_size, vocab, num_layers=1):
+        super(CaptionGenerator, self).__init__()
+        self.embed = nn.Embedding(vocab_size, embedding_size)
+        self.lstm = nn.LSTM(embedding_size, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, vocab_size)
-        self.end_token_id = vocab("<end>")
+        self.end_token = vocab("<end>")
 
-    def forward(self, image_features, captions):
-        embeddings = self.word_embeddings(captions[:, :-1])
-        inputs = torch.cat((image_features.unsqueeze(1), embeddings), dim=1)
-        lstm_output, _ = self.lstm(inputs)
-        outputs = self.fc(lstm_output)
-        return outputs
+    def forward(self, features, captions):
+        embeddings = self.embed(captions[:, :-1])
+        lstm_input = torch.cat((features.unsqueeze(1), embeddings), dim=1)
+        lstm_output, _ = self.lstm(lstm_input)
+        return self.fc(lstm_output)
 
-    def generate_caption(self, image_features, max_length=20):
-        generated_ids = []
-        states = None
-        inputs = image_features.unsqueeze(1)
-        for _ in range(max_length):
-            lstm_output, states = self.lstm(inputs, states)
-            outputs = self.fc(lstm_output.squeeze(1))
-            predicted_token = outputs.argmax(dim=1)
-            generated_ids.append(predicted_token.item())
-            if predicted_token.item() == self.end_token_id:
+    def predict(self, features, max_len=20):
+        results = []
+        input_features = features.unsqueeze(1)
+        hidden = None
+        for _ in range(max_len):
+            lstm_output, hidden = self.lstm(input_features, hidden)
+            logits = self.fc(lstm_output.squeeze(1))
+            predicted = logits.argmax(dim=1)
+            results.append(predicted.item())
+            if predicted.item() == self.end_token:
                 break
-            inputs = self.word_embeddings(predicted_token).unsqueeze(1)
-        return generated_ids
+            input_features = self.embed(predicted).unsqueeze(1)
+        return results
 
-# Paths and Initialization
-images_dir = '../coco_dataset/train2017'
-captions_path = '../coco_dataset/annotations/captions_train2017.json'
-embedding_dim = 256
+
+# Paths and Setup
+image_folder = "../coco_dataset/train2017"
+caption_file = "../coco_dataset/annotations/captions_train2017.json"
+embedding_size = 256
 hidden_dim = 512
-batch_size = 64
-num_epochs = 1
+batch_size = 32
+epochs = 10
 
-transform = transforms.Compose([
+# Data Preparation
+transformations = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-vocab = Vocabulary(annotations_file=captions_path, vocab_threshold=5)
-dataloader = get_data_loader(images_dir, captions_path, vocab, batch_size, transform)
+vocabulary = CaptionVocabulary(caption_file)
+train_loader = create_data_loader(image_folder, caption_file, vocabulary, batch_size, transformations)
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-encoder = VisionTransformerEncoder(embedding_dim).to(device)
-decoder = CaptionDecoder(embedding_dim, hidden_dim, len(vocab), vocab).to(device)
+# Model Initialization
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+encoder_model = TransformerEncoder(embedding_size).to(device)
+decoder_model = CaptionGenerator(embedding_size, hidden_dim, len(vocabulary), vocabulary).to(device)
 
-criterion = nn.CrossEntropyLoss(ignore_index=vocab.word2idx["<pad>"])
-encoder_optimizer = optim.Adam(encoder.parameters(), lr=1e-3)
-decoder_optimizer = optim.Adam(decoder.parameters(), lr=5e-3)
+# Optimizer and Loss
+criterion = nn.CrossEntropyLoss(ignore_index=0)
+encoder_optimizer = optim.Adam(encoder_model.parameters(), lr=0.001)
+decoder_optimizer = optim.Adam(decoder_model.parameters(), lr=0.005)
 
-# Training Loop
-encoder.train()
-decoder.train()
-for epoch in range(num_epochs):
-    total_loss = 0
-    for batch in tqdm(dataloader, desc=f'Epoch {epoch+1}/{num_epochs}', unit='batch'):
-        images = batch["image"].to(device)
-        captions = batch["caption"].to(device)
+# Training
+encoder_model.train()
+decoder_model.train()
+for epoch in range(epochs):
+    epoch_loss = 0
+    for data in tqdm(train_loader, desc=f"Epoch {epoch + 1}/{epochs}"):
+        images, captions = data["image"].to(device), data["caption"].to(device)
+
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
-        image_features = encoder(images)
-        outputs = decoder(image_features, captions)
-        loss = criterion(outputs.view(-1, len(vocab)), captions.view(-1))
+
+        img_features = encoder_model(images)
+        outputs = decoder_model(img_features, captions)
+        loss = criterion(outputs.view(-1, len(vocabulary)), captions.view(-1))
         loss.backward()
         encoder_optimizer.step()
         decoder_optimizer.step()
-        total_loss += loss.item()
-    print(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader):.4f}")
+
+        epoch_loss += loss.item()
+
+    print(f"Epoch {epoch + 1}, Avg Loss: {epoch_loss / len(train_loader):.4f}")
+
 
     # Compute BLEU Score after each epoch
     encoder.eval()
@@ -353,8 +368,9 @@ for epoch in range(num_epochs):
     encoder.train()
     decoder.train()
 
-torch.save(encoder.state_dict(), 'encoder_vit.pth')
-torch.save(decoder.state_dict(), 'decoder.pth')
+# Save Models
+torch.save(encoder_model.state_dict(), "custom_encoder.pth")
+torch.save(decoder_model.state_dict(), "custom_decoder.pth")
 
 # Final Evaluation
 images_dir_val = '../coco_dataset/val2017'
@@ -372,3 +388,5 @@ for batch in tqdm(dataloader_val, desc="Evaluating", unit="batch"):
     hypotheses.append([vocab.idx2word[idx] for idx in generated_ids if idx not in {0, 1, 2}])
 final_bleu_score = corpus_bleu(references, hypotheses)
 print(f"Final BLEU Score: {final_bleu_score:.4f}")
+
+
