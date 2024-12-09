@@ -80,4 +80,62 @@ text_to_speech_gtts(example_text)
 
 
 
+#######  TRANSLATIONNN ################
+
+# from gtts import gTTS
+# from deep_translator import GoogleTranslator
+# import os
+
+# def translate_and_speak(text, target_lang, filename="output.mp3"):
+#     """
+#     Translates text to the target language and converts it to speech.
+    
+#     Args:
+#         text (str): Text to translate and convert.
+#         target_lang (str): Target language code (e.g., "hi" for Hindi).
+#         filename (str): File to save the audio.
+#     """
+#     # Translate the text
+#     translated = GoogleTranslator(source="auto", target=target_lang).translate(text)
+#     print(f"Translated Text: {translated}")
+    
+#     # Convert translated text to speech
+#     tts = gTTS(translated, lang=target_lang)
+#     tts.save(filename)
+#     print(f"Speech saved as {filename}")
+#     os.system(f"mpg123 {filename}")
+
+# # Example usage
+# example_text = "Hello! How are you?"
+# translate_and_speak(example_text, target_lang="hi", filename="output_hindi.mp3")
+
+
+
+from gtts import gTTS
+from deep_translator import GoogleTranslator
+import os
+
+def translate_and_speak(text, target_lang, filename="output.mp3"):
+   
+    translated = GoogleTranslator(source="auto", target=target_lang).translate(text)
+    print(f"Translated Text: {translated}")
+    
+    tts = gTTS(translated, lang=target_lang)
+    tts.save(filename)
+    print(f"Speech saved as {filename}")
+    os.system(f"mpg123 {filename}")
+
+
+example_text = "Hello! How are you?"
+
+
+translate_and_speak(example_text, target_lang="hi", filename="output_hindi.mp3")
+
+
+translate_and_speak(example_text, target_lang="es", filename="output_spanish.mp3")
+
+
+translate_and_speak(example_text, target_lang="fr", filename="output_french.mp3")
+
+
 
