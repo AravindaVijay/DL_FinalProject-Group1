@@ -128,12 +128,12 @@ transform = transforms.Compose([
 dataloader = get_data_loader(images_dir, captions_path, vocab_exists=True, batch_size=1, transform=transform)
 
 # Generate captions for a few batches
-num_samples = 5  # Number of images to process
+num_samples = 5  
 sample_count = 0
 
 for batch in dataloader:
     images = batch['images'].to(device)
-    image_ids = batch['image_ids']  # Get the image IDs
+    image_ids = batch['image_ids']  
     features = encoder(images)
 
     # Generate captions
@@ -141,12 +141,12 @@ for batch in dataloader:
     generated_caption = [vocab.idx2word[idx] for idx in generated_ids]
 
     # Get the corresponding image file name
-    image_info = dataloader.dataset.coco.loadImgs(image_ids[0])[0]  # Access image info from COCO
+    image_info = dataloader.dataset.coco.loadImgs(image_ids[0])[0]  
     image_filename = image_info['file_name']
 
     # Display image and generated caption
     image = images[0].cpu().permute(1, 2, 0).numpy()
-    image = (image * [0.229, 0.224, 0.225]) + [0.485, 0.456, 0.406]  # De-normalize
+    image = (image * [0.229, 0.224, 0.225]) + [0.485, 0.456, 0.406]  
     image = np.clip(image, 0, 1)
 
     plt.imshow(image)
