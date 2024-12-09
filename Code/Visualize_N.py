@@ -28,4 +28,3 @@ def display_image_with_caption(image_tensor, caption, image_info=None):
     plt.axis('off')
     plt.title(title, fontsize=10)
     plt.show()
-

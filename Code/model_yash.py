@@ -1635,5 +1635,7 @@ if __name__ == "__main__":
     main()
 =======
 bleu = evaluate_model(encoder, decoder, val_loader)
+<<<<<<< feature/yash
 print(f"BLEU Score: {bleu:.4f}")
 >>>>>>> origin/main
+
