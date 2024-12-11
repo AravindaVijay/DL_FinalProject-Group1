@@ -41,7 +41,7 @@
 # criterion = nn.CrossEntropyLoss()
 # optimizer = optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate)
 
-# # Training loop
+# Training loop
 # print("Starting training...")
 # for epoch in range(num_epochs):
 #     encoder.train()
@@ -71,6 +71,73 @@
 #     torch.save(encoder.state_dict(), f"encoder_epoch_{epoch+1}.pth")
 #     torch.save(decoder.state_dict(), f"decoder_epoch_{epoch+1}.pth")
 #     print(f"Epoch {epoch+1}/{num_epochs} completed. Models saved.")
+
+# print("Training completed successfully!")
+
+# new training loop
+
+# from nltk.translate.bleu_score import corpus_bleu
+
+# # Training loop with BLEU score calculation
+# print("Starting training...")
+# for epoch in range(num_epochs):
+#     encoder.train()
+#     decoder.train()
+
+#     total_loss = 0  # To track loss across batches
+
+#     for i, batch in enumerate(dataloader):
+#         images = batch['images'].to(device)
+#         captions = batch['tokenized_caption'].to(device)
+
+#         # Forward pass
+#         features = encoder(images)
+#         outputs = decoder(features, captions)
+
+#         # Compute loss
+#         loss = criterion(outputs.view(-1, len(dataloader.dataset.vocab)), captions.view(-1))
+#         total_loss += loss.item()
+
+#         # Backward pass and optimization
+#         optimizer.zero_grad()
+#         loss.backward()
+#         optimizer.step()
+
+#         # Print progress
+#         if i % 10 == 0:
+#             print(f"Epoch [{epoch+1}/{num_epochs}], Step [{i+1}/{len(dataloader)}], Loss: {loss.item():.4f}")
+
+#     # Save the model after each epoch
+#     torch.save(encoder.state_dict(), f"encoder_epoch_{epoch+1}.pth")
+#     torch.save(decoder.state_dict(), f"decoder_epoch_{epoch+1}.pth")
+#     print(f"Epoch {epoch+1}/{num_epochs} completed. Average Loss: {total_loss / len(dataloader):.4f}. Models saved.")
+
+#     # Evaluation and BLEU score calculation
+#     encoder.eval()
+#     decoder.eval()
+
+#     references = []  # List of reference captions (ground truth)
+#     hypotheses = []  # List of generated captions (predictions)
+
+#     with torch.no_grad():
+#         for batch in dataloader:
+#             images = batch['images'].to(device)
+#             captions = batch['tokenized_caption']
+
+#             # Extract features and generate captions
+#             features = encoder(images)
+#             generated_ids = decoder.generate_caption(features)
+
+#             # Convert tokenized captions to words
+#             generated_caption = [dataloader.dataset.vocab.idx2word[idx] for idx in generated_ids]
+#             reference_caption = [[dataloader.dataset.vocab.idx2word[idx] for idx in caption if idx not in {0, 1, 2}] for caption in captions]
+
+#             # Add to BLEU score calculation
+#             hypotheses.append(generated_caption)
+#             references.append(reference_caption)
+
+#     bleu_score = corpus_bleu(references, hypotheses)
+#     print(f"Epoch {epoch+1} BLEU Score: {bleu_score:.4f}")
 
 # print("Training completed successfully!")
 
