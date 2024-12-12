@@ -22,10 +22,7 @@ class COCOCaptionDataset(Dataset):
                           If True, load vocab from existing vocab_file, if it exists.
             transform (callable, optional): Transformation to apply to the images.
         """
-
         self.coco = COCO(captions_path)
-        self.ids = list(self.coco.anns.keys())
-
         self.images_dir = images_dir
         self.transform = transform
         self.image_ids = list(self.coco.imgs.keys())
@@ -34,6 +31,8 @@ class COCOCaptionDataset(Dataset):
         # create vocabulary from the captions
         self.vocab = Vocabulary(annotations_file=captions_path, vocab_exists=vocab_exists)
 
+        self.coco = COCO(captions_path)
+        self.ids = list(self.coco.anns.keys())
         print("Obtaining caption lengths...")
 
         #  get list of tokens for each caption
@@ -61,20 +60,22 @@ class COCOCaptionDataset(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
 
         # Load captions
-        ann_id = self.ids[idx]
-        captions = self.coco.anns[ann_id]["caption"]
+        ann_ids = self.coco.getAnnIds(imgIds=image_id)
+        annotations = self.coco.loadAnns(ann_ids)
+        all_captions = [ann['caption'] for ann in annotations]
         tokenized_caption = [self.vocab(self.vocab.start_word)]
-        tokens = nltk.tokenize.word_tokenize(str(captions).lower())
+        tokens = nltk.tokenize.word_tokenize(str(all_captions[0]).lower())
         tokenized_caption.extend([self.vocab(token) for token in tokens])
         tokenized_caption.append(self.vocab(self.vocab.end_word))
         tokenized_caption = torch.Tensor(tokenized_caption).long()
 
         # Apply transformations
-        image = self.transform(image)
+        if self.transform:
+            image = self.transform(image)
 
         return {
             'image': image,
-            'all_captions': captions,
+            'all_captions': all_captions,
             'tokenized_caption': tokenized_caption,
             'image_id': image_id
         }
