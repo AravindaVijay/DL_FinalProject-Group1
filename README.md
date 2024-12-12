@@ -171,6 +171,12 @@ or
 python Code/generate_caption_resnet.py
 ```
 
+### 3. Start streamlit app
+
+```bash
+streamlit run Code/app.py
+```
+
 ---
 
 ## Results
