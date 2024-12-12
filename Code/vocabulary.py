@@ -86,7 +86,6 @@ class Vocabulary(object):
             if i % 100000 == 0:
                 print("[%d/%d] Tokenizing captions..." % (i, len(ids)))
 
-        # keep only words that repeated more than threshold times in the final vocabulary
         words = [word for word, cnt in counter.items() if cnt >= self.vocab_threshold]
 
         for i, word in enumerate(words):
