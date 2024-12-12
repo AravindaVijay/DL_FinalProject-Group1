@@ -13,4 +13,3 @@ def generate_caption_blip(image, text=None):
         inputs = processor(image, return_tensors="pt")
     out = model.generate(**inputs)
     return processor.decode(out[0], skip_special_tokens=True)
-

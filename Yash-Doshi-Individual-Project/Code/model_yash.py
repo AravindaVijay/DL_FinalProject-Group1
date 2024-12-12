@@ -302,7 +302,7 @@
 
 
 
-### DIFFFFFFERENT CODE
+### DIFFERENT CODE
 
 # import os
 # import torch
