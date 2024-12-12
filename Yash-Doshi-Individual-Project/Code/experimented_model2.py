@@ -1,6 +1,4 @@
 
-######################################## RESNET50 ########################################################
-
 import os
 import json
 import torch
@@ -17,9 +15,7 @@ torch.manual_seed(42)
 np.random.seed(42)
 random.seed(42)
 
-# --------------------
-# Vocabulary Class
-# --------------------
+
 class Vocabulary:
     def __init__(self):
         self.word2idx = {"<pad>": 0, "<start>": 1, "<end>": 2, "<unk>": 3}
@@ -40,12 +36,7 @@ class Vocabulary:
     def tokenize(self, caption):
         return [self.word2idx.get(word, self.word2idx["<unk>"]) for word in caption.split()]
 
-    def detokenize(self, tokens):
-        return " ".join([self.idx2word[token] for token in tokens if token not in [0, 1, 2]])
 
-# --------------------
-# COCO Dataset Class
-# --------------------
 class CocoDataset(Dataset):
     def __init__(self, img_dir, annotations_file, transform, vocab):
         self.img_dir = img_dir
@@ -71,9 +62,7 @@ class CocoDataset(Dataset):
                             [self.vocab.word2idx["<end>"]]
         return image, torch.tensor(tokenized_caption)
 
-# --------------------
-# Collate Function
-# --------------------
+
 def collate_fn(batch):
     images, captions = zip(*batch)
     images = torch.stack(images, dim=0)
@@ -82,15 +71,13 @@ def collate_fn(batch):
     padded_captions = torch.zeros((len(captions), max_length), dtype=torch.long)
     for i, cap in enumerate(captions):
         padded_captions[i, :len(cap)] = cap
-    return images, padded_captions, torch.tensor(caption_lengths)
+    return images, padded_captions
 
-# --------------------
-# Encoder
-# --------------------
+
 class EncoderCNN(nn.Module):
     def __init__(self, embed_size):
         super(EncoderCNN, self).__init__()
-        resnet = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+        resnet = models.resnet101(weights=models.ResNet101_Weights.IMAGENET1K_V1)
         modules = list(resnet.children())[:-1]  
         self.resnet = nn.Sequential(*modules)
         self.embed = nn.Linear(resnet.fc.in_features, embed_size)
@@ -101,9 +88,7 @@ class EncoderCNN(nn.Module):
         features = self.embed(features)
         return features
 
-# --------------------
-# Decoder
-# --------------------
+
 class DecoderRNN(nn.Module):
     def __init__(self, embed_size, hidden_size, vocab_size, num_layers=1):
         super(DecoderRNN, self).__init__()
@@ -118,82 +103,72 @@ class DecoderRNN(nn.Module):
         outputs = self.fc(hiddens)
         return outputs
 
-    def generate_caption(self, features, vocab, max_len=20):
-        generated = []
-        inputs = features.unsqueeze(1)
-        states = None
-        for _ in range(max_len):
-            hiddens, states = self.lstm(inputs, states)
-            outputs = self.fc(hiddens.squeeze(1))
-            predicted = outputs.argmax(1)
-            word = vocab.idx2word[predicted.item()]
-            if word == "<end>":
-                break
-            generated.append(word)
-            inputs = self.embed(predicted).unsqueeze(1)
-        return " ".join(generated)
 
-# --------------------
-# BLEU Score Calculation
-# --------------------
-def compute_bleu_score(references, hypotheses):
-    def ngram_counts(sequence, n):
-        return {tuple(sequence[i:i + n]): 1 for i in range(len(sequence) - n + 1)}
+# def train_model(encoder, decoder, dataloader, criterion, optimizer, device):
+#     encoder.train()
+#     decoder.train()
+#     total_loss = 0
+#     correct = 0
+#     total = 0
 
-    def precision(ref, hyp, n):
-        ref_ngrams = ngram_counts(ref, n)
-        hyp_ngrams = ngram_counts(hyp, n)
-        matched = sum(1 for ngram in hyp_ngrams if ngram in ref_ngrams)
-        return matched / max(1, len(hyp_ngrams))
+#     for images, captions in tqdm(dataloader, desc="Training"):
+#         images, captions = images.to(device), captions.to(device)
+#         optimizer.zero_grad()
 
-    precisions = [precision(ref, hyp, n) for n in range(1, 5)]
-    brevity_penalty = min(1.0, len(hyp) / len(ref))
-    bleu = brevity_penalty * np.exp(sum(np.log(p) if p > 0 else -1e6 for p in precisions) / 4)
-    return bleu
+#         features = encoder(images)
+#         outputs = decoder(features, captions[:, :-1])  # Exclude <end> token from input
+#         loss = criterion(outputs.reshape(-1, outputs.size(2)), captions[:, 1:].reshape(-1))
+#         loss.backward()
+#         optimizer.step()
+#         total_loss += loss.item()
 
-# --------------------
-# Training Function
-# --------------------
+#         # Calculate accuracy
+#         preds = outputs.argmax(dim=2)
+#         correct += (preds[:, :-1] == captions[:, 1:]).sum().item()
+#         total += captions[:, 1:].numel()
+
+#     accuracy = 100 * correct / total
+#     return total_loss / len(dataloader), accuracy
+
 def train_model(encoder, decoder, dataloader, criterion, optimizer, device):
     encoder.train()
     decoder.train()
     total_loss = 0
+    correct = 0
+    total = 0
 
-    for images, captions, lengths in tqdm(dataloader, desc="Training"):
+    for images, captions in tqdm(dataloader, desc="Training"):
         images, captions = images.to(device), captions.to(device)
         optimizer.zero_grad()
 
         features = encoder(images)
         outputs = decoder(features, captions[:, :-1])  
-        target_length = captions[:, 1:].shape[1]
-        output_length = outputs.shape[1]
 
-        if output_length > target_length:
-            outputs = outputs[:, :target_length, :]
-        elif output_length < target_length:
-            padding = torch.zeros((outputs.shape[0], target_length - output_length, outputs.shape[2]),
-                                   device=outputs.device)
-            outputs = torch.cat([outputs, padding], dim=1)
+       
+        outputs = outputs[:, :captions.size(1) - 1, :]  
 
         loss = criterion(outputs.reshape(-1, outputs.size(2)), captions[:, 1:].reshape(-1))  
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
 
-    return total_loss / len(dataloader)
+        
+        preds = outputs.argmax(dim=2)
+        correct += (preds == captions[:, 1:]).sum().item()
+        total += captions[:, 1:].numel()
 
-# --------------------
-# Main Script
-# --------------------
+    accuracy = 100 * correct / total
+    return total_loss / len(dataloader), accuracy
+
+
+
 def main():
     train_images = "../COCO_Data/train2017"
     train_captions = "../COCO_Data/annotations/captions_train2017.json"
-    val_images = "../COCO_Data/val2017"
-    val_captions = "../COCO_Data/annotations/captions_val2017.json"
 
     embed_size = 256
     hidden_size = 512
-    batch_size = 128
+    batch_size = 256
     num_epochs = 1
     learning_rate = 1e-3
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -210,40 +185,34 @@ def main():
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
 
+<<<<<<< HEAD
     train_dataset = CocoDataset(train_images, train_captions, transform, vocab)
-    val_dataset = CocoDataset(val_images, val_captions, transform, vocab)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-    val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
 
     encoder = EncoderCNN(embed_size).to(device)
     decoder = DecoderRNN(embed_size, hidden_size, len(vocab)).to(device)
     criterion = nn.CrossEntropyLoss(ignore_index=vocab.word2idx["<pad>"])
     optimizer = torch.optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), lr=learning_rate)
 
+
+    with open("summary_yash.txt", "w") as f:
+        f.write(str(encoder))
+        f.write("\n\n")
+        f.write(str(decoder))
+
     for epoch in range(num_epochs):
-        train_loss = train_model(encoder, decoder, train_loader, criterion, optimizer, device)
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss:.4f}")
+        train_loss, train_accuracy = train_model(encoder, decoder, train_loader, criterion, optimizer, device)
+        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.2f}%")
 
-    torch.save(encoder.state_dict(), "model_yash_encoder.pth")
-    torch.save(decoder.state_dict(), "model_yash_decoder.pth")
-    print("Models saved as 'model_yash_encoder.pth' and 'model_yash_decoder.pth'.")
-
-    encoder.eval()
-    decoder.eval()
-    references, hypotheses = [], []
-
-    with torch.no_grad():
-        for images, captions, lengths in tqdm(val_loader, desc="Evaluating"):
-            images = images.to(device)
-            features = encoder(images)
-            generated_caption = decoder.generate_caption(features, vocab)
-            references.append(captions[0].tolist())
-            hypotheses.append([vocab.word2idx[word] for word in generated_caption.split()])
-
-    bleu_score = compute_bleu_score(references, hypotheses)
-    print(f"BLEU Score: {bleu_score:.4f}")
+    torch.save(encoder.state_dict(), "model_yash_resnet101_encoder.pth")
+    torch.save(decoder.state_dict(), "model_yash_resnet101_decoder.pth")
+    print("Models saved as 'model_yash_resnet101_encoder.pth' and 'model_yash_resnet101_decoder.pth'.")
 
 if __name__ == "__main__":
     main()
-
+=======
+bleu = evaluate_model(encoder, decoder, val_loader)
+<<<<<<< feature/yash
+print(f"BLEU Score: {bleu:.4f}")
+>>>>>>> origin/main
 
