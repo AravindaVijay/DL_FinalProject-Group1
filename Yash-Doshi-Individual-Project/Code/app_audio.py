@@ -4,7 +4,7 @@ from deep_translator import GoogleTranslator
 from io import BytesIO
 from PIL import Image
 
-# CSS for styling
+
 st.markdown(
     """
     <style>
@@ -27,7 +27,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Function to translate and convert text to speech
+
 def translate_and_speak(text, target_lang):
     translated = GoogleTranslator(source="auto", target=target_lang).translate(text)
     tts = gTTS(translated, lang=target_lang)
@@ -35,7 +35,7 @@ def translate_and_speak(text, target_lang):
     tts.write_to_fp(audio_bytes)
     return translated, audio_bytes
 
-# Home/Demo Page
+
 def home_demo_page():
     st.markdown('<div class="header-container">', unsafe_allow_html=True)
     st.markdown('<h1 class="header-title" style="text-align: center;">Vision Voice</h1>', unsafe_allow_html=True)
@@ -56,10 +56,10 @@ def home_demo_page():
             image = Image.open(camera_image).convert("RGB")
 
     if image is not None:
-        # Display the uploaded or captured image
+       
         st.image(image, caption="Selected Image", use_container_width=True)
 
-        # Placeholder for model-generated caption
+       
         caption = "This is a placeholder caption for the selected image."
         st.write("Generated Caption: ", caption)
 
@@ -95,7 +95,7 @@ def home_demo_page():
     else:
         st.write("Please upload or capture an image to generate a caption.")
 
-# About Page
+
 def about_page():
     st.header("About the Project")
     st.write("""

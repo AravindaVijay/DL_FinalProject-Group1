@@ -240,7 +240,8 @@ def main():
     #         x = x.view(x.size(0), -1)  # Flatten
     #         x = self.fc(x)
     #         return x
-    
+    #
+    #
     # class CustomRNNDecoder(nn.Module):
     #     def __init__(self, embedding_dim, hidden_dim, vocab_size, num_layers=1):
     #         super(CustomRNNDecoder, self).__init__()
@@ -303,7 +304,7 @@ def main():
     vocab_size = len(vocab)
     encoder = ImageEncoder(embedding_dim).to(device)
     decoder = CaptionDecoder(embedding_dim, hidden_dim, vocab_size, vocab).to(device)
-
+    #
     criterion = (
         nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
     )
@@ -320,16 +321,29 @@ def main():
 
         for batch in tqdm(dataloader, desc=f'Epoch {epoch+1}/{num_epochs}', unit='batch'):
             images = batch['images'].to(device)
-            captions = batch['tokenized_caption'].to(device)
-
+            # captions = batch['tokenized_caption'].to(device)
+            all_captions = batch['all_captions']
             encoder.zero_grad()
             decoder.zero_grad()
-
             image_features = encoder(images)
-            outputs = decoder(image_features, captions)
-            loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
-            total_loss += loss.item()
-            loss.backward()
+            for i, captions in enumerate(all_captions):
+                for caption in captions:
+                    tokenized_caption = [vocab(vocab.start_word)]
+                    tokens = nltk.tokenize.word_tokenize(str(caption).lower())
+                    tokenized_caption.extend([vocab(token) for token in tokens])
+                    tokenized_caption.append(vocab(vocab.end_word))
+                    tokenized_caption = torch.Tensor(tokenized_caption).long().to(device)
+
+                    outputs = decoder(image_features[i].unsqueeze(0), tokenized_caption.unsqueeze(0))
+                    loss = criterion(outputs.view(-1, vocab_size), tokenized_caption.view(-1))
+                    total_loss += loss.item()
+                    loss.backward(retain_graph=True)
+
+            # image_features = encoder(images)
+            # outputs = decoder(image_features, captions)
+            # loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
+            # total_loss += loss.item()
+            # loss.backward()
             optimizer.step()
 
         avg_loss = total_loss / len(dataloader)
@@ -337,17 +351,17 @@ def main():
         encoder_scheduler.step()
         decoder_scheduler.step()
 
-    torch.save(encoder.state_dict(), 'encoder.pth')
-    torch.save(decoder.state_dict(), 'decoder.pth')
-
-
-    ####################################################################################################
-    #Evaluating the model
-    ####################################################################################################
+        torch.save(encoder.state_dict(), 'encoder_new.pth')
+        torch.save(decoder.state_dict(), 'decoder_new.pth')
+#
+#
+# ####################################################################################################
+# #Evaluating the model
+# ####################################################################################################
 
     transform_test = transforms.Compose(
         [
-            transforms.Resize(224),
+            transforms.Resize(256),
             transforms.ToTensor(),
             transforms.Normalize(
                 (0.485, 0.456, 0.406),  # normalize image for pre-trained model
@@ -456,86 +470,92 @@ def main():
 
     avg_bleu_score = evaluate_model(dataloader)
     print(f"Average BLEU Score: {avg_bleu_score}")
+# #
 
-
-    ##########################################################################################################################
-    #this is to generate caption for a single image
-    ############################################################################################################################
-    # # %%
-    # import os
-    # os.chdir('/home/ubuntu/DL/Code')
-    # import torch
-    # from torchvision import transforms
-    # from PIL import Image
-    # from model import ImageEncoder, CaptionDecoder
-    # from vocabulary import Vocabulary
-    #
-    #
-    # vocab = Vocabulary(annotations_file='../COCO_Data/annotations/captions_train2017.json', vocab_exists=True)
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    #
-    # transform = transforms.Compose([
-    #     transforms.Resize((256, 256)),
-    #     transforms.ToTensor(),
-    #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    # ])
-    # #
-    # def generate_caption(image_path, max_length=20):
-    #     # Load the models
-    #     embedding_dim = 256
-    #     hidden_dim = 512
-    #     vocab_size = len(vocab)
-    #     encoder = ImageEncoder(embedding_dim).to(device)
-    #     decoder = CaptionDecoder(embedding_dim, hidden_dim, vocab_size, vocab).to(device)
-    #     encoder.load_state_dict(torch.load('encoder.pth'))
-    #     decoder.load_state_dict(torch.load('decoder.pth'))
-    #     encoder.eval()
-    #     decoder.eval()
-    #     image = Image.open(image_path).convert('RGB')
-    #     try:
-    #         image = transform(image).unsqueeze(0).to(device)
-    #     except Exception as e:
-    #         print(f"Error during transform: {e}")
-    #         return ""
-    #     with torch.no_grad():
-    #         image_features = encoder(image)
-    #     # Generate caption
-    #     generated_ids = decoder.generate_caption(image_features, max_length=max_length)
-    #     generated_caption = ' '.join([vocab.idx2word[idx] for idx in generated_ids])
-    #
-    #     return generated_caption
-    #
-    # #use this for beam search generate
-    # def generatecaption(image_path, beam_size=3, max_length=20):
-    #     # Load the models
-    #     embedding_dim = 256
-    #     hidden_dim = 512
-    #     vocab_size = len(vocab)
-    #     encoder = ImageEncoder(embedding_dim).to(device)
-    #     decoder = CaptionDecoder(embedding_dim, hidden_dim, vocab_size, vocab).to(device)
-    #     encoder.load_state_dict(torch.load('encoder.pth'))
-    #     decoder.load_state_dict(torch.load('decoder.pth'))
-    #     encoder.eval()
-    #     decoder.eval()
-    #     image = Image.open(image_path).convert('RGB')
-    #     try:
-    #         image = transform(image).unsqueeze(0).to(device)
-    #     except Exception as e:
-    #         print(f"Error during transform: {e}")
-    #         return ""
-    #     with torch.no_grad():
-    #         image_features = encoder(image)
-    #
-    #     # Generate caption using beam search
-    #     generated_words = decoder.generate_caption(image_features, beam_size=beam_size, max_length=max_length)
-    #     generated_caption = ' '.join(generated_words)
-    #
-    #     return generated_caption
-    #
-    #
-    # image_path = '//home/ubuntu/DL/COCO_Data/test2017/000000004432.jpg'
-    # caption = generate_caption(image_path)
-    # print(f'Generated Caption: {caption}')
+##########################################################################################################################
+#this is to generate caption for a single image
+############################################################################################################################
+#%%
+# import os
+# os.chdir('/home/ubuntu/DL/Code')
+# import torch
+# from torchvision import transforms
+# from PIL import Image
+# from model import ImageEncoder, CaptionDecoder
+# from vocabulary import Vocabulary
+# import requests
+# from io import BytesIO
+#
+#
+# vocab = Vocabulary(annotations_file='../COCO_Data/annotations/captions_train2017.json', vocab_exists=True)
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#
+# transform = transforms.Compose([
+#     transforms.Resize((256, 256)),
+#     transforms.ToTensor(),
+#     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+# ])
+# #
+# def generate_caption(image_path, max_length=20):
+#     # Load the models
+#     embedding_dim = 256
+#     hidden_dim = 512
+#     vocab_size = len(vocab)
+#     encoder = ImageEncoder(embedding_dim).to(device)
+#     decoder = CaptionDecoder(embedding_dim, hidden_dim, vocab_size, vocab).to(device)
+#     encoder.load_state_dict(torch.load('encoder.pth'))
+#     decoder.load_state_dict(torch.load('decoder.pth'))
+#     encoder.eval()
+#     decoder.eval()
+#     image = Image.open(image_path).convert('RGB')
+#     try:
+#         image = transform(image).unsqueeze(0).to(device)
+#     except Exception as e:
+#         print(f"Error during transform: {e}")
+#         return ""
+#     with torch.no_grad():
+#         image_features = encoder(image)
+#     # Generate caption
+#     generated_ids = decoder.generate_caption(image_features, max_length=max_length)
+#     generated_caption = ' '.join([vocab.idx2word[idx] for idx in generated_ids])
+#
+#     return generated_caption
+#
+# #use this for beam search generate
+# def generatecaption(image_path, beam_size=3, max_length=20):
+#     # Load the models
+#     embedding_dim = 256
+#     hidden_dim = 512
+#     vocab_size = len(vocab)
+#     encoder = ImageEncoder(embedding_dim).to(device)
+#     decoder = CaptionDecoder(embedding_dim, hidden_dim, vocab_size, vocab).to(device)
+#     encoder.load_state_dict(torch.load('encoder.pth'))
+#     decoder.load_state_dict(torch.load('decoder.pth'))
+#     encoder.eval()
+#     decoder.eval()
+#     if image_path.startswith('http://') or image_path.startswith('https://'):
+#         response = requests.get(image_path)
+#         image = Image.open(BytesIO(response.content)).convert('RGB')
+#     else:
+#         image = Image.open(image_path).convert('RGB')
+#     try:
+#         image = transform(image).unsqueeze(0).to(device)
+#     except Exception as e:
+#         print(f"Error during transform: {e}")
+#         return ""
+#     with torch.no_grad():
+#         image_features = encoder(image)
+#
+#     # Generate caption using beam search
+#     generated_words = decoder.generate_caption(image_features, beam_size=beam_size, max_length=max_length)
+#     generated_caption = ' '.join(generated_words)
+#
+#     return generated_caption
+#
+#
+# image_path = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXxfn1j1vKFy8yJeBGl2AS6Dcah-lKgHofg&s'
+# caption = generatecaption(image_path)
+# print(f'Generated Caption: {caption}')
 
 #%%
 
