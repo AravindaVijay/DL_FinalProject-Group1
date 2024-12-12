@@ -1,5 +1,6 @@
 import streamlit as st
 from gtts import gTTS
+from deep_translator import GoogleTranslator
 from io import BytesIO
 from PIL import Image
 from generate_caption_beam import generate_caption_beam
@@ -75,12 +76,44 @@ def home_demo_page():
             caption = generate_caption_blip(image)
         st.write("Generated Caption: ", caption)
 
-        # Convert caption to speech
-        if st.button("🔊 Convert to Speech"):
-            tts = gTTS(text=caption, lang='en')
+
+        # Function to translate and convert text to speech
+        def translate_and_speak(text, target_lang):
+            translated = GoogleTranslator(source="auto", target=target_lang).translate(text)
+            tts = gTTS(translated, lang=target_lang)
             audio_bytes = BytesIO()
             tts.write_to_fp(audio_bytes)
-            st.audio(audio_bytes, format="audio/mp3")
+            return translated, audio_bytes
+
+
+        st.subheader("Convert Caption to Speech in Different Languages:")
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            if st.button("🔊 English"):
+                st.write("Caption in English: ", caption)
+                tts = gTTS(text=caption, lang='en')
+                audio_bytes = BytesIO()
+                tts.write_to_fp(audio_bytes)
+                st.audio(audio_bytes, format="audio/mp3")
+
+        with col2:
+            if st.button("🔊 Hindi"):
+                translated, audio_bytes = translate_and_speak(caption, target_lang="hi")
+                st.write("Caption in Hindi: ", translated)
+                st.audio(audio_bytes, format="audio/mp3")
+
+        with col3:
+            if st.button("🔊 Spanish"):
+                translated, audio_bytes = translate_and_speak(caption, target_lang="es")
+                st.write("Caption in Spanish: ", translated)
+                st.audio(audio_bytes, format="audio/mp3")
+
+        with col4:
+            if st.button("🔊 French"):
+                translated, audio_bytes = translate_and_speak(caption, target_lang="fr")
+                st.write("Caption in French: ", translated)
+                st.audio(audio_bytes, format="audio/mp3")
     else:
         st.write("Please upload or capture an image to generate a caption.")
 
