@@ -231,7 +231,7 @@ def main():
     #         self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
     #         self.pool = nn.AdaptiveAvgPool2d((1, 1))  # Pool to 1x1 feature map
     #         self.fc = nn.Linear(64, embedding_dim)
-    #
+    
     #     def forward(self, images):
     #         x = torch.relu(self.conv1(images))
     #         x = torch.relu(self.conv2(x))
@@ -250,19 +250,19 @@ def main():
     #         self.fc = nn.Linear(hidden_dim, vocab_size)
     #         self.hidden_dim = hidden_dim
     #         self.num_layers = num_layers
-    #
+    
     #     def forward(self, image_features, captions):
     #         embeddings = self.embedding(captions[:, :-1])  # Exclude <end> token
     #         inputs = torch.cat((image_features.unsqueeze(1), embeddings), dim=1)
     #         rnn_output, _ = self.rnn(inputs)
     #         outputs = self.fc(rnn_output)
     #         return outputs
-    #
+    
     #     def generate_caption(self, inputs, states=None, max_length=20):
     #         batch_size = inputs.size(0)
     #         if states is None:
     #             states = torch.zeros(self.num_layers, batch_size, self.hidden_dim).to(inputs.device)
-    #
+    
     #         generated_ids = []
     #         inputs = inputs.unsqueeze(1)
     #         for _ in range(max_length):

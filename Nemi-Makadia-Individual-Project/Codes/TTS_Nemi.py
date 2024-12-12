@@ -25,7 +25,6 @@ def text_to_speech_gtts(text, filename="output.mp3", lang="en"):
         filename (str): File name to save the audio file.
         lang (str): Language for the text-to-speech conversion (default is 'en').
     """
-    # Convert text to speech in the specified language
     tts = gTTS(text, lang=lang)
     tts.save(filename)
     print(f"Speech saved as {filename}")
@@ -37,6 +36,7 @@ example_text = "Hello! How are you?"
 text_to_speech_gtts(example_text, filename="output_french.mp3", lang="fr")
 text_to_speech_gtts(example_text, filename="output_spanish.mp3", lang="es")
 text_to_speech_gtts(example_text, filename="output_hindi.mp3", lang="hi")
+
 
 
 
