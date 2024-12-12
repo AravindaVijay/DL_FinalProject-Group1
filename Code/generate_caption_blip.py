@@ -14,20 +14,3 @@ def generate_caption_blip(image, text=None):
     out = model.generate(**inputs)
     return processor.decode(out[0], skip_special_tokens=True)
 
-
-# img_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg' 
-# raw_image = Image.open(requests.get(img_url, stream=True).raw).convert('RGB')
-
-# # conditional image captioning
-# text = "a photography of"
-# inputs = processor(raw_image, text, return_tensors="pt")
-
-# out = model.generate(**inputs)
-# print(processor.decode(out[0], skip_special_tokens=True))
-# # >>> a photography of a woman and her dog
-
-# # unconditional image captioning
-# inputs = processor(raw_image, return_tensors="pt")
-
-# out = model.generate(**inputs)
-# print(processor.decode(out[0], skip_special_tokens=True))
